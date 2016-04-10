@@ -20,9 +20,9 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 //declare globals
-var t, tempdataarray, heatdataarray, setpointdataarray, dutyCycle, options_temp, options_heat, plot, gaugeDisplay, newGaugeDisplay;
+var t, tempdataarray, heatdataarray, setpointdataarray, options_temp, options_heat, plot, gaugeDisplay, newGaugeDisplay;
 var capture_on = 1;
-var tempUnits, temp, setpoint;
+var temp, setpoint;
 t = 0;
 
 function findLS(selected_start, selected_end, in_pointArray) {
@@ -124,28 +124,13 @@ function waitForMsg() {
 
 		success : function(data) {
 
-			//alert(data.mode);
-			//temp_F = (9.0/5.0)*parseFloat(data.temp) + 32;
-			//temp_F = temp_F.toFixed(2);
-			//temp_C = (5.0/9.0)*(parseFloat(data.temp) - 32);
-			//temp_C = temp_C.toFixed(2);
-
-			jQuery('#tempResponse').html(data.temp);
-
-			if (data.tempUnits == "F") {
-				jQuery('#tempResponseUnits').html("&#176F");
-				jQuery('#setpointResponseUnits').html("&#176F");
-				jQuery('#setpointInputUnits').html("&#176F");
-			} else {
-				jQuery('#tempResponseUnits').html("&#176C");
-				jQuery('#setpointResponseUnits').html("&#176C");
-				jQuery('#setpointInputUnits').html("&#176C");
-			}
-
+            jQuery('#tempResponse').html(data.temp);
+            jQuery('#tempResponseUnits').html("&#176C");
+            jQuery('#setpointResponseUnits').html("&#176C");
+            jQuery('#setpointInputUnits').html("&#176C");
 			jQuery('#modeResponse').html(data.mode);
 			jQuery('#setpointResponse').html(data.set_point);
-			jQuery('#dutycycleResponse').html(parseFloat(data.duty_cycle).toFixed(2));
-			dutyCycle = data.duty_cycle;
+			jQuery('#dutycycleResponse').html(data.duty_cycle.toFixed(2));
 			jQuery('#cycletimeResponse').html(data.cycle_time);
 			jQuery('#k_paramResponse').html(data.k_param);
 			jQuery('#i_paramResponse').html(data.i_param);
@@ -154,7 +139,6 @@ function waitForMsg() {
 			gaugeDisplay.setValue(parseFloat(data.temp));
 
 			if (data.mode == "auto") {
-				//setpoint_C = (5.0/9.0)*(parseFloat(data.set_point) - 32);
 				setpointdataarray.push([t, parseFloat(data.set_point)]);
 			} else {
 				setpointdataarray = [];
@@ -162,9 +146,6 @@ function waitForMsg() {
 
 			tempdataarray.push([t, parseFloat(data.temp)]);
 			heatdataarray.push([t, parseFloat(data.duty_cycle)]);
-
-			//tempdataarray.push([i,parseFloat(data.temp)]);
-			//heatdataarray.push([i,parseFloat(data.duty_cycle)]);
 
 			while (tempdataarray.length > jQuery('#windowSizeText').val()) {
 				tempdataarray.shift();
@@ -190,8 +171,6 @@ function waitForMsg() {
 					plot = jQuery.plot($("#tempplot"), [tempdataarray], options_temp);
 				}
 				plot = jQuery.plot($("#heatplot"), [heatdataarray], options_heat);
-				//plot.setData([dataarray]);
-				//plot.draw();
 				setTimeout('waitForMsg()', 1);
 				//in millisec
 			}
@@ -211,8 +190,7 @@ jQuery(document).ready(function() {
 		t = 0;
 		waitForMsg();
 	});
-	//jQuery('#calcpid').click(function() {
-	//});
+
 	jQuery("#tempplot").bind("plotselected", function(event, ranges) {
 		var selected_start = ranges.xaxis.from;
 		var selected_end = ranges.xaxis.to;
@@ -275,17 +253,17 @@ jQuery(document).ready(function() {
 		majorTickLabel : true,
 		value : 60,
 		label : 'Temp',
-		unitsLabel : '' + String.fromCharCode(186),
-		min : 60,
-		max : 220,
+		unitsLabel : ' °C',
+		min : 20,
+		max : 100,
 		majorTicks : 9,
-		minorTicks : 9, // small ticks inside each major tick
-		greenFrom : 60,
-		greenTo : 95,
-		yellowFrom : 95,
-		yellowTo : 150,
-		redFrom : 150,
-		redTo : 200
+		minorTicks : 4, // small ticks inside each major tick
+		greenFrom : 58,
+		greenTo : 65,
+		yellowFrom : 65,
+		yellowTo : 70,
+		redFrom : 70,
+		redTo : 100
 	};
 
 	gaugeDisplay = new Gauge(document.getElementById('tempGauge'), options_gauge);

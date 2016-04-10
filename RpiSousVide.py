@@ -1,26 +1,20 @@
 # -*- coding: utf-8 -*-
 
 from multiprocessing import Process, Pipe, Queue, current_process
-from Queue import Full
-from subprocess import call
-from datetime import datetime
 import time
 import os
 import RPi.GPIO as GPIO
-from pid import PIDController
+import PIDController
 import xml.etree.ElementTree as ET
 from flask import Flask, render_template, request, jsonify
 
 global parent_conn, statusQ
 global xml_root, template_name, pinHeatList, pinGPIOList
-# global brewtime, oneWireDir
 
 app = Flask(__name__, template_folder='templates')
-# url_for('static', filename='raspibrew.css')
+
 
 # Parameters that are used in the temperature control process
-
-
 class Param:
     status = {
         "temp": "0",
@@ -37,9 +31,8 @@ class Param:
         "d_param": 4
     }
 
+
 # main web page
-
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'GET':
@@ -50,8 +43,6 @@ def index():
                                d_param=Param.status["d_param"])
 
     else:  # request.method == 'POST' (first temp sensor / backwards compatibility)
-        # get command from web browser or Android
-        # print request.form
         Param.status["mode"] = request.form["mode"]
         Param.status["set_point"] = float(request.form["setpoint"])
         Param.status["duty_cycle"] = float(request.form["dutycycle"])  # is boil duty cycle if mode == "boil"
@@ -68,70 +59,24 @@ def index():
 
         return 'OK'
 
-# post params (selectable temp sensor number)
-
-
-# @app.route('/postparams/<sensorNum>', methods=['POST'])
-@app.route('/postparams', methods=['POST'])
-def postparams():
-
-    Param.status["mode"] = request.form["mode"]
-    Param.status["set_point"] = float(request.form["setpoint"])
-    Param.status["duty_cycle"] = float(request.form["dutycycle"])  # is boil duty cycle if mode == "boil"
-    Param.status["cycle_time"] = float(request.form["cycletime"])
-    Param.status["boil_manage_temp"] = float(request.form.get("boilManageTemp", Param.status["boil_manage_temp"]))
-    Param.status["num_pnts_smooth"] = int(request.form.get("numPntsSmooth", Param.status["num_pnts_smooth"]))
-    Param.status["k_param"] = float(request.form["k"])
-    Param.status["i_param"] = float(request.form["i"])
-    Param.status["d_param"] = float(request.form["d"])
-
-    # send to main temp control process
-    # if did not receive variable key value in POST, the Param class default is used
-    parent_conn.send(Param.status)
-    return 'OK'
 
 # post GPIO
-# @app.route('/GPIO_Toggle/<GPIO_Num>/<onoff>', methods=['GET'])
-# def GPIO_Toggle(GPIO_Num=None, onoff=None):
-#
-#     if len(pinGPIOList) >= int(GPIO_Num):
-#         out = {"pin" : pinGPIOList[int(GPIO_Num)-1], "status" : "off"}
-#         if onoff == "on":
-#             GPIO.output(pinGPIOList[int(GPIO_Num)-1], ON)
-#             out["status"] = "on"
-#             print "GPIO Pin #%s is toggled on" % pinGPIOList[int(GPIO_Num)-1]
-#         else: #off
-#             GPIO.output(pinGPIOList[int(GPIO_Num)-1], OFF)
-#             print "GPIO Pin #%s is toggled off" % pinGPIOList[int(GPIO_Num)-1]
-#     else:
-#         out = {"pin" : 0, "status" : "off"}
-#
-#     return jsonify(**out)
+@app.route('/GPIO_Toggle/<GPIO_Num>/<onoff>', methods=['GET'])
+def GPIO_Toggle(GPIO_Num=None, onoff=None):
 
-# get status from RasPiBrew using firefox web browser (first temp sensor / backwards compatibility)
-# @app.route('/getstatus') #only GET
-# def getstatusB():
-#     #blocking receive - current status
-#     Param.status = statusQ.get()
-#     return jsonify(**Param.status)
+    if len(pinGPIOList) >= int(GPIO_Num):
+        out = {"pin": pinGPIOList[int(GPIO_Num)-1], "status": "off"}
+        if onoff == "on":
+            GPIO.output(pinGPIOList[int(GPIO_Num)-1], ON)
+            out["status"] = "on"
+            print("GPIO Pin #%s is toggled on" % pinGPIOList[int(GPIO_Num)-1])
+        else:  # off
+            GPIO.output(pinGPIOList[int(GPIO_Num)-1], OFF)
+            print("GPIO Pin #%s is toggled off" % pinGPIOList[int(GPIO_Num)-1])
+    else:
+        out = {"pin": 0, "status": "off"}
 
-# #get status from RasPiBrew using firefox web browser (selectable temp sensor)
-# @app.route('/getstatus/<sensorNum>') #only GET
-# def getstatus(sensorNum=None):
-#     #blocking receive - current status
-#     if sensorNum == "1":
-#         Param.status = statusQ.get()
-#     elif sensorNum == "2":
-#         Param.status = statusQ_B.get()
-#     elif sensorNum == "3":
-#         Param.status = statusQ_C.get()
-#     else:
-#         print "Sensor doesn't exist (GET)"
-#         Param.status["temp"] = "-999"
-#
-#     return jsonify(**Param.status)
-
-# get status from RasPiBrew using firefox web browser (selectable temp sensor)
+    return jsonify(**out)
 
 
 @app.route('/getstatus')  # only GET
@@ -140,22 +85,20 @@ def getstatus():
     Param.status = statusQ.get()
     return jsonify(**Param.status)
 
-# def getbrewtime():
-#     return (time.time() - brewtime)
 
 # Stand Alone Get Temperature Process
-
-
-# def gettempProc(conn, myTempSensor):
 def gettempProc(conn):
     p = current_process()
     print('Starting:', p.name, p.pid)
+    i = 0
+    num_arr = [45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70]
 
     while True:
         t = time.time()
-        time.sleep(.5)  # .1+~.83 = ~1.33 seconds
+        # time.sleep(.5)  # .1+~.83 = ~1.33 seconds
+        time.sleep(2)
         # num = myTempSensor.readTempC()
-        num = 20
+        num = num_arr[i]
         elapsed = "%.2f" % (time.time() - t)
         conn.send([num, elapsed])
 
@@ -245,7 +188,7 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
         parent_conn_temp, child_conn_temp = Pipe()
         # Start Get Temperature Process
         # ptemp = Process(name = "gettempProc", target=gettempProc, args=(child_conn_temp, myTempSensor))
-        ptemp = Process(name="gettempProc", target=gettempProc, args=child_conn_temp)
+        ptemp = Process(name="gettempProc", target=gettempProc, args=(child_conn_temp,))
         ptemp.daemon = True
         ptemp.start()
 
@@ -322,7 +265,7 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
                 while statusQ.qsize() >= 2:
                     statusQ.get()  # remove old status
 
-                print("Current Temp: %3.2f C, Heat Output: %3.1f%%" % (temp, duty_cycle))
+                #print("Current Temp: %3.2f C, Heat Output: %3.1f%%" % (temp, duty_cycle))
 
                 # logdata(temp, duty_cycle)
 
@@ -373,13 +316,6 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
 if __name__ == '__main__':
 
     # brewtime = time.time()
-
-    # The next two calls are not needed for January 2015 or newer builds (kernel 3.18.8 and higher)
-    # /boot/config.txt needs 'dtoverlay=w1-gpio' at the bottom of the file
-    call(["modprobe", "w1-gpio"])
-    call(["modprobe", "w1-therm"])
-    call(["modprobe", "i2c-bcm2708"])
-    call(["modprobe", "i2c-dev"])
 
     # Retrieve root element from config.xml for parsing
     tree = ET.parse('config.xml')
