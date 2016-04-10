@@ -420,13 +420,6 @@ if __name__ == '__main__':
     else:
         print("No RootDir tag found in config.xml, running from current directory")
 
-    useLCD = xml_root.find('Use_LCD').text.strip()
-    if useLCD == "yes":
-        tempUnits = xml_root.find('Temp_Units').text.strip()
-        display = Display.LCD(tempUnits)
-    else:
-        display = Display.NoDisplay()
-
     gpioNumberingScheme = xml_root.find('GPIO_pin_numbering_scheme').text.strip()
     if gpioNumberingScheme == "BOARD":
         GPIO.setmode(GPIO.BOARD)
