@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from multiprocessing import Process, Pipe, Queue, current_process
-from queue import Full
+from Queue import Full
 import time
 import os
 import RPi.GPIO as GPIO
@@ -102,6 +102,10 @@ def gettempProc(conn):
         num = num_arr[i]
         elapsed = "%.2f" % (time.time() - t)
         conn.send([num, elapsed])
+        if num == 70:
+            i = 0
+        else:
+            i += 1
 
 
 # Get time heating element is on and off during a set cycle time
@@ -237,7 +241,8 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
 
                     # calculate PID every cycle
                     if readyPIDcalc:
-                        duty_cycle = PIDController.calcPID(temp_ma, set_point, True)
+                        pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # init pid
+                        duty_cycle = pid.calcPID(temp_ma, set_point, True)
                         # send to heat process every cycle
                         parent_conn_heat.send([cycle_time, duty_cycle])
                         readyPIDcalc = False
@@ -329,7 +334,7 @@ if __name__ == '__main__':
         ON = 0
         OFF = 1
 
-    pinNum = xml_root.find('Heat_Pin').text.strip()
+    pinNum = int(xml_root.find('Heat_Pin').text.strip())
 
     pinGPIOList = []
     for pin in xml_root.iter('GPIO_Pin'):
