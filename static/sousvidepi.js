@@ -20,7 +20,7 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 //declare globals
-var t, tempdataarray, heatdataarray, setpointdataarray, options_temp, options_heat, plot, gaugeDisplay, newGaugeDisplay;
+var t, tempdataarray, heatdataarray, setpointdataarray, options_temp, options_heat, plot, gaugeDisplay;
 var capture_on = 1;
 var temp, setpoint;
 t = 0;
@@ -225,7 +225,6 @@ jQuery(document).ready(function() {
 			jQuery("#tooltip").remove();
 			previousPoint = null;
 		}
-
 	});
 
 	jQuery('#controlPanelForm').submit(function() {
@@ -251,7 +250,7 @@ jQuery(document).ready(function() {
 	//draw gauge
 	var options_gauge = {
 		majorTickLabel : true,
-		value : 60,
+		value : 45,
 		label : 'Temp',
 		unitsLabel : ' °C',
 		min : 20,
