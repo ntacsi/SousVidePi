@@ -2,18 +2,17 @@
 
 from multiprocessing import Process, Pipe, Queue, current_process
 from Queue import Full
-from subprocess import Popen, PIPE, call
+from subprocess import call
 from datetime import datetime
-import time, random, serial, os
-from smbus import SMBus
+import time, os
 import RPi.GPIO as GPIO
 from pid import pidpy as PIDController
 import xml.etree.ElementTree as ET
 from flask import Flask, render_template, request, jsonify
 
-global parent_conn, parent_connB, parent_connC, statusQ, statusQ_B, statusQ_C
+global parent_conn, statusQ
 global xml_root, template_name, pinHeatList, pinGPIOList
-global brewtime, oneWireDir
+# global brewtime, oneWireDir
 
 app = Flask(__name__, template_folder='templates')
 #url_for('static', filename='raspibrew.css')
@@ -21,9 +20,7 @@ app = Flask(__name__, template_folder='templates')
 #Parameters that are used in the temperature control process
 class param:
     status = {
-        "numTempSensors" : 0,
         "temp" : "0",
-        "tempUnits" : "F",
         "elapsed" : "0",
         "mode" : "off",
         "cycle_time" : 2.0,
@@ -67,8 +64,9 @@ def index():
         return 'OK'
 
 #post params (selectable temp sensor number)
-@app.route('/postparams/<sensorNum>', methods=['POST'])
-def postparams(sensorNum=None):
+# @app.route('/postparams/<sensorNum>', methods=['POST'])
+@app.route('/postparams', methods=['POST'])
+def postparams():
 
     param.status["mode"] = request.form["mode"]
     param.status["set_point"] = float(request.form["setpoint"])
@@ -82,89 +80,73 @@ def postparams(sensorNum=None):
 
     #send to main temp control process
     #if did not receive variable key value in POST, the param class default is used
-    if sensorNum == "1":
-        print "got post to temp sensor 1"
-        parent_conn.send(param.status)
-    elif sensorNum == "2":
-        print "got post to temp sensor 2"
-        if len(pinHeatList) >= 2:
-            parent_connB.send(param.status)
-        else:
-            param.status["mode"] = "No Temp Control"
-            param.status["set_point"] = 0.0
-            param.status["duty_cycle"] = 0.0
-            parent_connB.send(param.status)
-            print "no heat GPIO pin assigned"
-    elif sensorNum == "3":
-        print "got post to temp sensor 3"
-        if len(pinHeatList) >= 3:
-            parent_connC.send(param.status)
-        else:
-            param.status["mode"] = "No Temp Control"
-            param.status["set_point"] = 0.0
-            param.status["duty_cycle"] = 0.0
-            parent_connC.send(param.status)
-            print "no heat GPIO pin assigned"
-    else:
-        print "Sensor doesn't exist (POST)"
-
+    parent_conn.send(param.status)
     return 'OK'
 
 #post GPIO
-@app.route('/GPIO_Toggle/<GPIO_Num>/<onoff>', methods=['GET'])
-def GPIO_Toggle(GPIO_Num=None, onoff=None):
-
-    if len(pinGPIOList) >= int(GPIO_Num):
-        out = {"pin" : pinGPIOList[int(GPIO_Num)-1], "status" : "off"}
-        if onoff == "on":
-            GPIO.output(pinGPIOList[int(GPIO_Num)-1], ON)
-            out["status"] = "on"
-            print "GPIO Pin #%s is toggled on" % pinGPIOList[int(GPIO_Num)-1]
-        else: #off
-            GPIO.output(pinGPIOList[int(GPIO_Num)-1], OFF)
-            print "GPIO Pin #%s is toggled off" % pinGPIOList[int(GPIO_Num)-1]
-    else:
-        out = {"pin" : 0, "status" : "off"}
-
-    return jsonify(**out)
+# @app.route('/GPIO_Toggle/<GPIO_Num>/<onoff>', methods=['GET'])
+# def GPIO_Toggle(GPIO_Num=None, onoff=None):
+#
+#     if len(pinGPIOList) >= int(GPIO_Num):
+#         out = {"pin" : pinGPIOList[int(GPIO_Num)-1], "status" : "off"}
+#         if onoff == "on":
+#             GPIO.output(pinGPIOList[int(GPIO_Num)-1], ON)
+#             out["status"] = "on"
+#             print "GPIO Pin #%s is toggled on" % pinGPIOList[int(GPIO_Num)-1]
+#         else: #off
+#             GPIO.output(pinGPIOList[int(GPIO_Num)-1], OFF)
+#             print "GPIO Pin #%s is toggled off" % pinGPIOList[int(GPIO_Num)-1]
+#     else:
+#         out = {"pin" : 0, "status" : "off"}
+#
+#     return jsonify(**out)
 
 #get status from RasPiBrew using firefox web browser (first temp sensor / backwards compatibility)
+# @app.route('/getstatus') #only GET
+# def getstatusB():
+#     #blocking receive - current status
+#     param.status = statusQ.get()
+#     return jsonify(**param.status)
+
+# #get status from RasPiBrew using firefox web browser (selectable temp sensor)
+# @app.route('/getstatus/<sensorNum>') #only GET
+# def getstatus(sensorNum=None):
+#     #blocking receive - current status
+#     if sensorNum == "1":
+#         param.status = statusQ.get()
+#     elif sensorNum == "2":
+#         param.status = statusQ_B.get()
+#     elif sensorNum == "3":
+#         param.status = statusQ_C.get()
+#     else:
+#         print "Sensor doesn't exist (GET)"
+#         param.status["temp"] = "-999"
+#
+#     return jsonify(**param.status)
+
+#get status from RasPiBrew using firefox web browser (selectable temp sensor)
 @app.route('/getstatus') #only GET
-def getstatusB():
+def getstatus():
     #blocking receive - current status
     param.status = statusQ.get()
     return jsonify(**param.status)
 
-#get status from RasPiBrew using firefox web browser (selectable temp sensor)
-@app.route('/getstatus/<sensorNum>') #only GET
-def getstatus(sensorNum=None):
-    #blocking receive - current status
-    if sensorNum == "1":
-        param.status = statusQ.get()
-    elif sensorNum == "2":
-        param.status = statusQ_B.get()
-    elif sensorNum == "3":
-        param.status = statusQ_C.get()
-    else:
-        print "Sensor doesn't exist (GET)"
-        param.status["temp"] = "-999"
-
-    return jsonify(**param.status)
-
-def getbrewtime():
-    return (time.time() - brewtime)
+# def getbrewtime():
+#     return (time.time() - brewtime)
 
 # Stand Alone Get Temperature Process
-def gettempProc(conn, myTempSensor):
+# def gettempProc(conn, myTempSensor):
+def gettempProc(conn):
     p = current_process()
     print 'Starting:', p.name, p.pid
 
     while (True):
         t = time.time()
         time.sleep(.5) #.1+~.83 = ~1.33 seconds
-        num = myTempSensor.readTempC()
+        # num = myTempSensor.readTempC()
+        num = 20
         elapsed = "%.2f" % (time.time() - t)
-        conn.send([num, myTempSensor.sensorNum, elapsed])
+        conn.send([num, elapsed])
 
 #Get time heating element is on and off during a set cycle time
 def getonofftime(cycle_time, duty_cycle):
@@ -214,13 +196,10 @@ def unPackParamInitAndPost(paramStatus):
     return mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
            k_param, i_param, d_param
 
-def packParamGet(numTempSensors, myTempSensorNum, temp, tempUnits, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, \
+def packParamGet(temp, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, \
                                  boil_manage_temp, num_pnts_smooth, k_param, i_param, d_param):
 
-    param.status["numTempSensors"] = numTempSensors
-    param.status["myTempSensorNum"] = myTempSensorNum
     param.status["temp"] = temp
-    param.status["tempUnits"] = tempUnits
     param.status["elapsed"] = elapsed
     param.status["mode"] = mode
     param.status["cycle_time"] = cycle_time
@@ -236,7 +215,7 @@ def packParamGet(numTempSensors, myTempSensorNum, temp, tempUnits, elapsed, mode
     return param.status
 
 # Main Temperature Control Process
-def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, statusQ, conn):
+def tempControlProc(pinNum, paramStatus, statusQ, conn):
 
         mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
         k_param, i_param, d_param = unPackParamInitAndPost(paramStatus)
@@ -247,7 +226,8 @@ def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, status
         #Pipe to communicate with "Get Temperature Process"
         parent_conn_temp, child_conn_temp = Pipe()
         #Start Get Temperature Process
-        ptemp = Process(name = "gettempProc", target=gettempProc, args=(child_conn_temp, myTempSensor))
+        # ptemp = Process(name = "gettempProc", target=gettempProc, args=(child_conn_temp, myTempSensor))
+        ptemp = Process(name="gettempProc", target=gettempProc, args=child_conn_temp)
         ptemp.daemon = True
         ptemp.start()
 
@@ -261,35 +241,35 @@ def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, status
         temp_ma_list = []
         manage_boil_trigger = False
 
-        tempUnits = xml_root.find('Temp_Units').text.strip()
-        numTempSensors = 0
-        for tempSensorId in xml_root.iter('Temp_Sensor_Id'):
-            numTempSensors += 1
+        # tempUnits = xml_root.find('Temp_Units').text.strip()
+        # numTempSensors = 0
+        # for tempSensorId in xml_root.iter('Temp_Sensor_Id'):
+        #     numTempSensors += 1
 
         temp_ma = 0.0
 
 	#overwrite log file for new data log
-        ff = open("brewery" + str(myTempSensor.sensorNum) + ".csv", "wb")
-        ff.close()
+        # ff = open("brewery" + str(myTempSensor.sensorNum) + ".csv", "wb")
+        # ff.close()
 
         readyPIDcalc = False
 
         while (True):
             readytemp = False
             while parent_conn_temp.poll(): #Poll Get Temperature Process Pipe
-                temp_C, tempSensorNum, elapsed = parent_conn_temp.recv() #non blocking receive from Get Temperature Process
+                temp, elapsed = parent_conn_temp.recv() #non blocking receive from Get Temperature Process
 
-                if temp_C == -99:
+                if temp == -99:
                     print "Bad Temp Reading - retry"
                     continue
 
-                if (tempUnits == 'F'):
-                    temp = (9.0/5.0)*temp_C + 32
-                else:
-                    temp = temp_C
+                # if (tempUnits == 'F'):
+                #     temp = (9.0/5.0)*temp_C + 32
+                # else:
+                #     temp = temp_C
 
                 temp_str = "%3.2f" % temp
-                display.showTemperature(temp_str)
+                # display.showTemperature(temp_str)
 
                 readytemp = True
 
@@ -331,7 +311,7 @@ def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, status
 
                 #put current status in queue
                 try:
-                    paramStatus = packParamGet(numTempSensors, myTempSensor.sensorNum, temp_str, tempUnits, elapsed, mode, cycle_time, duty_cycle, \
+                    paramStatus = packParamGet(temp_str, elapsed, mode, cycle_time, duty_cycle, \
                             boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, k_param, i_param, d_param)
                     statusQ.put(paramStatus) #GET request
                 except Full:
@@ -340,10 +320,10 @@ def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, status
                 while (statusQ.qsize() >= 2):
                     statusQ.get() #remove old status
 
-                print "Current Temp: %3.2f deg %s, Heat Output: %3.1f%%" \
-                                                        % (temp, tempUnits, duty_cycle)
+                print "Current Temp: %3.2f C, Heat Output: %3.1f%%" \
+                                                        % (temp, duty_cycle)
 
-                logdata(myTempSensor.sensorNum, temp, duty_cycle)
+                logdata(temp, duty_cycle)
 
                 readytemp == False
 
@@ -353,7 +333,6 @@ def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, status
 
             while parent_conn_heat.poll(): #Poll Heat Process Pipe
                 cycle_time, duty_cycle = parent_conn_heat.recv() #non blocking receive from Heat Process
-                display.showDutyCycle(duty_cycle)
                 readyPIDcalc = True
 
             readyPOST = False
@@ -365,20 +344,17 @@ def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, status
                 readyPOST = True
             if readyPOST == True:
                 if mode == "auto":
-                    display.showAutoMode(set_point)
                     print "auto selected"
                     pid = PIDController.pidpy(cycle_time, k_param, i_param, d_param) #init pid
                     duty_cycle = pid.calcPID_reg4(temp_ma, set_point, True)
                     parent_conn_heat.send([cycle_time, duty_cycle])
                 if mode == "boil":
-                    display.showBoilMode()
                     print "boil selected"
                     boil_duty_cycle = duty_cycle_temp
                     duty_cycle = 100 #full power to boil manage temperature
                     manage_boil_trigger = True
                     parent_conn_heat.send([cycle_time, duty_cycle])
                 if mode == "manual":
-                    display.showManualMode()
                     print "manual selected"
                     duty_cycle = duty_cycle_temp
                     parent_conn_heat.send([cycle_time, duty_cycle])
@@ -391,15 +367,15 @@ def tempControlProc(myTempSensor, display, pinNum, readOnly, paramStatus, status
             time.sleep(.01)
 
 
-def logdata(tank, temp, heat):
-    f = open("brewery" + str(tank) + ".csv", "ab")
-    f.write("%3.1f;%3.3f;%3.3f\n" % (getbrewtime(), temp, heat))
-    f.close()
+# def logdata(tank, temp, heat):
+#     f = open("brewery" + str(tank) + ".csv", "ab")
+#     f.write("%3.1f;%3.3f;%3.3f\n" % (getbrewtime(), temp, heat))
+#     f.close()
 
 
 if __name__ == '__main__':
 
-    brewtime = time.time()
+    # brewtime = time.time()
 
 
     # The next two calls are not needed for January 2015 or newer builds (kernel 3.18.8 and higher)
@@ -446,39 +422,21 @@ if __name__ == '__main__':
     for pinNum in pinGPIOList:
         GPIO.setup(pinNum, GPIO.OUT)
 
-    for tempSensorId in xml_root.iter('Temp_Sensor_Id'):
-        myTempSensor = Temp1Wire.Temp1Wire(tempSensorId.text.strip())
+    # for tempSensorId in xml_root.iter('Temp_Sensor_Id'):
+    #     myTempSensor = Temp1Wire.Temp1Wire(tempSensorId.text.strip())
 
-        if len(pinHeatList) >= myTempSensor.sensorNum + 1:
-            pinNum = pinHeatList[myTempSensor.sensorNum]
-            readOnly = False
-        else:
-            pinNum = 0
-            readOnly = True
+        # if len(pinHeatList) >= myTempSensor.sensorNum + 1:
+        #     pinNum = pinHeatList[myTempSensor.sensorNum]
+        #     readOnly = False
+        # else:
+        #     pinNum = 0
+        #     readOnly = True
 
-        if myTempSensor.sensorNum >= 1:
-            display = Display.NoDisplay()
-
-        if myTempSensor.sensorNum == 0:
-            statusQ = Queue(2) #blocking queue
-            parent_conn, child_conn = Pipe()
-            p = Process(name = "tempControlProc", target=tempControlProc, args=(myTempSensor, display, pinNum, readOnly, \
-                                                              param.status, statusQ, child_conn))
-            p.start()
-
-        if myTempSensor.sensorNum == 1:
-            statusQ_B = Queue(2) #blocking queue
-            parent_connB, child_conn = Pipe()
-            p = Process(name = "tempControlProc", target=tempControlProc, args=(myTempSensor, display, pinNum, readOnly, \
-                                                              param.status, statusQ_B, child_conn))
-            p.start()
-
-        if myTempSensor.sensorNum == 2:
-            statusQ_C = Queue(2) #blocking queue
-            parent_connC, child_conn = Pipe()
-            p = Process(name = "tempControlProc", target=tempControlProc, args=(myTempSensor, display, pinNum, readOnly, \
-                                                              param.status, statusQ_C, child_conn))
-            p.start()
+        statusQ = Queue(2) #blocking queue
+        parent_conn, child_conn = Pipe()
+        p = Process(name = "tempControlProc", target=tempControlProc, args=(pinNum, \
+                                                          param.status, statusQ, child_conn))
+        p.start()
 
     app.debug = True
     app.run(use_reloader=False, host='0.0.0.0')
