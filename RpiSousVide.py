@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from multiprocessing import Process, Pipe, Queue, current_process
+from queue import Full
 import time
 import os
 import RPi.GPIO as GPIO
@@ -102,18 +103,16 @@ def gettempProc(conn):
         elapsed = "%.2f" % (time.time() - t)
         conn.send([num, elapsed])
 
+
 # Get time heating element is on and off during a set cycle time
-
-
 def getonofftime(cycle_time, duty_cycle):
     duty = duty_cycle/100.0
     on_time = cycle_time*duty
     off_time = cycle_time*(1.0-duty)
     return [on_time, off_time]
 
+
 # Stand Alone Heat Process using GPIO
-
-
 def heatProcGPIO(cycle_time, duty_cycle, pinNum, conn):
     p = current_process()
     print('Starting:', p.name, p.pid)
@@ -138,9 +137,6 @@ def heatProcGPIO(cycle_time, duty_cycle, pinNum, conn):
 
 
 def unPackParamInitAndPost(paramStatus):
-    # temp = paramStatus["temp"]
-    # tempUnits = paramStatus["tempUnits"]
-    # elapsed = paramStatus["elapsed"]
     mode = paramStatus["mode"]
     cycle_time = paramStatus["cycle_time"]
     duty_cycle = paramStatus["duty_cycle"]
@@ -174,9 +170,8 @@ def packParamGet(temp, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle, s
 
     return Param.status
 
+
 # Main Temperature Control Process
-
-
 def tempControlProc(pinNum, paramStatus, statusQ, conn):
         mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
             k_param, i_param, d_param = unPackParamInitAndPost(paramStatus)
@@ -265,13 +260,9 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
                 while statusQ.qsize() >= 2:
                     statusQ.get()  # remove old status
 
-                #print("Current Temp: %3.2f C, Heat Output: %3.1f%%" % (temp, duty_cycle))
+                # print("Current Temp: %3.2f C, Heat Output: %3.1f%%" % (temp, duty_cycle))
 
                 # logdata(temp, duty_cycle)
-
-                # if only reading temperature (no temp control)
-                # if readOnly:
-                #     continue
 
             while parent_conn_heat.poll():  # Poll Heat Process Pipe
                 cycle_time, duty_cycle = parent_conn_heat.recv()  # non blocking receive from Heat Process
@@ -314,14 +305,10 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
 
 
 if __name__ == '__main__':
-
-    # brewtime = time.time()
-
     # Retrieve root element from config.xml for parsing
     tree = ET.parse('config.xml')
     xml_root = tree.getroot()
     template_name = xml_root.find('Template').text.strip()
-
     root_dir_elem = xml_root.find('RootDir')
     if root_dir_elem is not None:
         os.chdir(root_dir_elem.text.strip())
@@ -342,31 +329,22 @@ if __name__ == '__main__':
         ON = 0
         OFF = 1
 
-    pinHeatList = []
-    for pin in xml_root.iter('Heat_Pin'):
-        pinHeatList.append(int(pin.text.strip()))
+    pinNum = xml_root.find('Heat_Pin').text.strip()
 
     pinGPIOList = []
     for pin in xml_root.iter('GPIO_Pin'):
         pinGPIOList.append(int(pin.text.strip()))
 
-    for pinNum in pinGPIOList:
-        GPIO.setup(pinNum, GPIO.OUT)
+    for pin in pinGPIOList:
+        GPIO.setup(pin, GPIO.OUT)
 
     # for tempSensorId in xml_root.iter('Temp_Sensor_Id'):
     #     myTempSensor = Temp1Wire.Temp1Wire(tempSensorId.text.strip())
 
-        # if len(pinHeatList) >= myTempSensor.sensorNum + 1:
-        #     pinNum = pinHeatList[myTempSensor.sensorNum]
-        #     readOnly = False
-        # else:
-        #     pinNum = 0
-        #     readOnly = True
-
-        statusQ = Queue(2)  # blocking queue
-        parent_conn, child_conn = Pipe()
-        p = Process(name="tempControlProc", target=tempControlProc, args=(pinNum, Param.status, statusQ, child_conn))
-        p.start()
+    statusQ = Queue(2)  # blocking queue
+    parent_conn, child_conn = Pipe()
+    p = Process(name="tempControlProc", target=tempControlProc, args=(pinNum, Param.status, statusQ, child_conn))
+    p.start()
 
     app.debug = True
     app.run(use_reloader=False, host='0.0.0.0')
