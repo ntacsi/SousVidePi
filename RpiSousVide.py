@@ -11,9 +11,6 @@ from pid import pidpy as PIDController
 import xml.etree.ElementTree as ET
 from flask import Flask, render_template, request, jsonify
 
-import Temp1Wire
-import Display
-
 global parent_conn, parent_connB, parent_connC, statusQ, statusQ_B, statusQ_C
 global xml_root, template_name, pinHeatList, pinGPIOList
 global brewtime, oneWireDir
