@@ -23,13 +23,13 @@ class Param:
         "mode": "off",
         "cycle_time": 2.0,
         "duty_cycle": 0.0,
-        "boil_duty_cycle": 60,
+        "boil_duty_cycle": 100,
         "set_point": 0.0,
-        "boil_manage_temp": 200,
+        "boil_manage_temp": 50,
         "num_pnts_smooth": 5,
-        "k_param": 44,
-        "i_param": 165,
-        "d_param": 4
+        "k_param": 45,
+        "i_param": 160,
+        "d_param": 5
     }
 
 
@@ -233,11 +233,6 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
                         for temp_idx in range(num_pnts_smooth):
                             temp_ma += temp_ma_list[temp_idx]
                         temp_ma /= num_pnts_smooth
-
-                    # print "len(temp_ma_list) = %d" % len(temp_ma_list)
-                    # print "Num Points smooth = %d" % num_pnts_smooth
-                    # print "temp_ma = %.2f" % temp_ma
-                    # print temp_ma_list
 
                     # calculate PID every cycle
                     if readyPIDcalc:
