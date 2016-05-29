@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <Config>
 	<!-- Where the RasPiBrew will be served from -->
-	<RootDir>/mnt/NAS/Software/Rpi/SousVidePi</RootDir>
+	<RootDir>/mnt/share/SousVidePi</RootDir>
 	<!-- Place templates (themes) in templates folder -->
 	<!-- The static folder must contain the corresponding css and js files -->
 	<Template>sousvidepi.html</Template>
@@ -10,7 +10,7 @@
 	<!-- Temperature Sensor Id - used with DS18B20 -->
 	<Temp_Sensor_Id>28-0000037eb5c0</Temp_Sensor_Id>
 	<!-- Temperature Sensor pin - used with ADC -->
-	<Temp_Sensor_Pin></Temp_Sensor_Pin>
+	<Temp_Sensor_Pin>None</Temp_Sensor_Pin>
 	<!-- Heating element controller pin -->
 	<Heat_Pin>17</Heat_Pin>
 	<!-- If your relay board work inverted mode set to 1 -->

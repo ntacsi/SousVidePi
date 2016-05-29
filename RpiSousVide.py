@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 from multiprocessing import Process, Pipe, Queue, current_process
 from Queue import Full
@@ -89,17 +88,19 @@ def getstatus():
 
 
 # Stand Alone Get Temperature Process
-def gettempProc(conn, myTempSensor = None):
+def gettempProc(conn):
     p = current_process()
     print('Starting:', p.name, p.pid)
-    if myTempSensor is not None:
+    if not tempSensorId == "None":
+        myTempSensor = Temp1Wire.Temp1Wire(tempSensorId)
         while True:
             t = time.time()
             time.sleep(2)
             num = myTempSensor.readTempC()
             elapsed = "%.2f" % (time.time() - t)
             conn.send([num, elapsed])
-    else:
+
+    if not tempSensorPin == "None":
         myADC = mcp3208.mcp3208(tempSensorPin)
         while True:
             t = time.time()
@@ -177,7 +178,7 @@ def packParamGet(temp, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle, s
 
 
 # Main Temperature Control Process
-def tempControlProc(myTempSensor=None, pinNum, paramStatus, statusQ, conn):
+def tempControlProc(pinNum, paramStatus, statusQ, conn, myTempSensor=None):
         mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
             k_param, i_param, d_param = unPackParamInitAndPost(paramStatus)
 
@@ -343,17 +344,12 @@ if __name__ == '__main__':
     parent_conn, child_conn = Pipe()
 
     tempSensorId = xml_root.find('Temp_Sensor_Id').text.strip()
-    if not tempSensorId == "":
-        myTempSensor = Temp1Wire.Temp1Wire(tempSensorId)
-        p = Process(name="tempControlProc", target=tempControlProc,
-                    args=(pinHeat, Param.status, statusQ, child_conn, myTempSensor))
-        p.start()
 
     tempSensorPin = xml_root.find('Temp_Sensor_Pin').text.strip()
-    if not tempSensorPin == "":
-        p = Process(name="tempControlProc", target=tempControlProc,
-                    args=(pinHeat, Param.status, statusQ, child_conn))
-        p.start()
+
+    p = Process(name="tempControlProc", target=tempControlProc,
+                args=(pinHeat, Param.status, statusQ, child_conn))
+    p.start()
 
     app.debug = True
     app.run(use_reloader=False, host='0.0.0.0')
