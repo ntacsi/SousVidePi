@@ -7,15 +7,14 @@
 	<Template>sousvidepi.html</Template>
 	<!-- GPIO pin numbering scheme - choose BOARD or BCM. If something else than these are given, BCM is chosen as default. -->
 	<GPIO_pin_numbering_scheme>BCM</GPIO_pin_numbering_scheme>
-	<!-- Temperature Sensor Id -->
-	<!-- For Temp Control the Temp_Sensor_Id must have a corresponding GPIO Pin used -->
-	<!-- for heat, otherwise the temperature sensor is only for temp readout -->
-	<!-- Repeat same element names (Temp_Sensor_Id and optional Heat_Pin) for additional temp sensors -->
-	<!-- Currently limited to 3 temp sensors but that can easily be expanded in raspibrew.py -->
+	<!-- Temperature Sensor Id - used with DS18B20 -->
 	<Temp_Sensor_Id>28-0000037eb5c0</Temp_Sensor_Id>
+	<!-- Temperature Sensor pin - used with ADC -->
+	<Temp_Sensor_Pin></Temp_Sensor_Pin>
+	<!-- Heating element controller pin -->
 	<Heat_Pin>17</Heat_Pin>
 	<!-- If your relay board work inverted mode set to 1 -->
-	<GPIO_Inverted>0</GPIO_Inverted>
+	<GPIO_Inverted>1</GPIO_Inverted>
 	<!-- Up to 2 GPIO pins are supported but can easily be expanded in code-->
 	<!-- Repeat <GPIO_Pin> element name -->
 	<GPIO_Pin>18</GPIO_Pin>

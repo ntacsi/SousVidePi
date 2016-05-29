@@ -2,15 +2,16 @@
 
 from multiprocessing import Process, Pipe, Queue, current_process
 from Queue import Full
-import time
-import os
+import os, time
 import RPi.GPIO as GPIO
 import PIDController
+import Temp1Wire, mcp3208
 import xml.etree.ElementTree as ET
 from flask import Flask, render_template, request, jsonify
 
 global parent_conn, statusQ
-global xml_root, template_name, pinHeatList, pinGPIOList
+global xml_root, template_name, pinHeat, pinGPIOList, tempSensorId, tempSensorPin
+global oneWireDir
 
 app = Flask(__name__, template_folder='templates')
 
@@ -88,24 +89,24 @@ def getstatus():
 
 
 # Stand Alone Get Temperature Process
-def gettempProc(conn):
+def gettempProc(conn, myTempSensor = None):
     p = current_process()
     print('Starting:', p.name, p.pid)
-    i = 0
-    num_arr = [45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70]
-
-    while True:
-        t = time.time()
-        # time.sleep(.5)  # .1+~.83 = ~1.33 seconds
-        time.sleep(2)
-        # num = myTempSensor.readTempC()
-        num = num_arr[i]
-        elapsed = "%.2f" % (time.time() - t)
-        conn.send([num, elapsed])
-        if num == 70:
-            i = 0
-        else:
-            i += 1
+    if myTempSensor is not None:
+        while True:
+            t = time.time()
+            time.sleep(2)
+            num = myTempSensor.readTempC()
+            elapsed = "%.2f" % (time.time() - t)
+            conn.send([num, elapsed])
+    else:
+        myADC = mcp3208.mcp3208(tempSensorPin)
+        while True:
+            t = time.time()
+            time.sleep(2)
+            num = myADC.temp_get()
+            elapsed = "%.2f" % (time.time() - t)
+            conn.send([num, elapsed])
 
 
 # Get time heating element is on and off during a set cycle time
@@ -176,7 +177,7 @@ def packParamGet(temp, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle, s
 
 
 # Main Temperature Control Process
-def tempControlProc(pinNum, paramStatus, statusQ, conn):
+def tempControlProc(myTempSensor=None, pinNum, paramStatus, statusQ, conn):
         mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
             k_param, i_param, d_param = unPackParamInitAndPost(paramStatus)
 
@@ -210,7 +211,7 @@ def tempControlProc(pinNum, paramStatus, statusQ, conn):
                 temp, elapsed = parent_conn_temp.recv()  # non blocking receive from Get Temperature Process
 
                 if temp == -99:
-                    print("Bad Temp Reading - retry")
+                    print "Bad Temp Reading - retry"
                     continue
 
                 temp_str = "%3.2f" % temp
@@ -329,7 +330,7 @@ if __name__ == '__main__':
         ON = 0
         OFF = 1
 
-    pinNum = int(xml_root.find('Heat_Pin').text.strip())
+    pinHeat = int(xml_root.find('Heat_Pin').text.strip())
 
     pinGPIOList = []
     for pin in xml_root.iter('GPIO_Pin'):
@@ -338,13 +339,21 @@ if __name__ == '__main__':
     for pin in pinGPIOList:
         GPIO.setup(pin, GPIO.OUT)
 
-    # for tempSensorId in xml_root.iter('Temp_Sensor_Id'):
-    #     myTempSensor = Temp1Wire.Temp1Wire(tempSensorId.text.strip())
-
     statusQ = Queue(2)  # blocking queue
     parent_conn, child_conn = Pipe()
-    p = Process(name="tempControlProc", target=tempControlProc, args=(pinNum, Param.status, statusQ, child_conn))
-    p.start()
+
+    tempSensorId = xml_root.find('Temp_Sensor_Id').text.strip()
+    if not tempSensorId == "":
+        myTempSensor = Temp1Wire.Temp1Wire(tempSensorId)
+        p = Process(name="tempControlProc", target=tempControlProc,
+                    args=(pinHeat, Param.status, statusQ, child_conn, myTempSensor))
+        p.start()
+
+    tempSensorPin = xml_root.find('Temp_Sensor_Pin').text.strip()
+    if not tempSensorPin == "":
+        p = Process(name="tempControlProc", target=tempControlProc,
+                    args=(pinHeat, Param.status, statusQ, child_conn))
+        p.start()
 
     app.debug = True
     app.run(use_reloader=False, host='0.0.0.0')
