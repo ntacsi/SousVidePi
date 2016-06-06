@@ -20,8 +20,6 @@ class PIDController(object):
         self.k1 = 0.0
         self.k2 = 0.0
         self.k3 = 0.0
-        self.ts_ticks = 0
-        self.pid_model = 3
         self.pp = 0.0
         self.pi = 0.0
         self.pd = 0.0
@@ -31,26 +29,19 @@ class PIDController(object):
             self.k0 = self.kc * self.ts / self.ti
         self.k1 = self.kc * self.td / self.ts
 
+
     def calcPID(self, xk, tset, enable):
-        ek = 0.0
         ek = tset - xk  # calculate e[k] = SP[k] - PV[k]
-        
-        if enable:
-            # -----------------------------------------------------------
-            # Calculate PID controller:
-            # y[k] = y[k-1] + kc*(PV[k-1] - PV[k] +
-            # Ts*e[k]/Ti +
-            # Td/Ts*(2*PV[k-1] - PV[k] - PV[k-2]))
-            # -----------------------------------------------------------
-            self.pp = self.kc * (PIDController.xk_1 - xk)  # y[k] = y[k-1] + Kc*(PV[k-1] - PV[k])
-            self.pi = self.k0 * ek  # + Kc*Ts/Ti * e[k]
-            self.pd = self.k1 * (2.0 * PIDController.xk_1 - xk - PIDController.xk_2)
-            PIDController.yk += self.pp + self.pi + self.pd
-        else:
-            PIDController.yk = 0.0
-            self.pp = 0.0
-            self.pi = 0.0
-            self.pd = 0.0
+        # -----------------------------------------------------------
+        # Calculate PID controller:
+        # y[k] = y[k-1] + kc*(PV[k-1] - PV[k] +
+        # Ts*e[k]/Ti +
+        # Td/Ts*(2*PV[k-1] - PV[k] - PV[k-2]))
+        # -----------------------------------------------------------
+        self.pp = self.kc * (PIDController.xk_1 - xk)  # y[k] = y[k-1] + Kc*(PV[k-1] - PV[k])
+        self.pi = self.k0 * ek  # + Kc*Ts/Ti * e[k]
+        self.pd = self.k1 * (2.0 * PIDController.xk_1 - xk - PIDController.xk_2)
+        PIDController.yk += self.pp + self.pi + self.pd
             
         PIDController.xk_2 = PIDController.xk_1  # PV[k-2] = PV[k-1]
         PIDController.xk_1 = xk    # PV[k-1] = PV[k]
