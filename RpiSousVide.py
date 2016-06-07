@@ -10,7 +10,6 @@ from flask import Flask, render_template, request, jsonify
 
 global parent_conn, statusQ
 global xml_root, template_name, pinHeat, pinGPIOList, tempSensorId, tempSensorPin
-global oneWireDir
 
 app = Flask(__name__, template_folder='templates')
 
@@ -21,7 +20,7 @@ class Param:
         "temp": "0",
         "elapsed": "0",
         "mode": "off",
-        "cycle_time": 2.0,
+        "cycle_time": 5.0,
         "duty_cycle": 0.0,
         "boil_duty_cycle": 100,
         "set_point": 0.0,
@@ -127,17 +126,17 @@ def heatProcGPIO(cycle_time, duty_cycle, conn):
         while True:
             while conn.poll():  # get last
                 cycle_time, duty_cycle = conn.recv()
-                #print('Cycle_time: ', cycle_time, 'Duty cycle: ', duty_cycle)
+                print('Cycle_time: ', cycle_time, 'Duty cycle: ', duty_cycle)
             conn.send([cycle_time, duty_cycle])
-            if duty_cycle == 0:
+            if int(duty_cycle) == 0:
                 GPIO.output(pinHeat, OFF)
                 time.sleep(cycle_time)
-            elif duty_cycle == 100:
+            elif int(duty_cycle) == 100:
                 GPIO.output(pinHeat, ON)
                 time.sleep(cycle_time)
             else:
                 on_time, off_time = getonofftime(cycle_time, duty_cycle)
-                #print(('On-time: ', on_time, 'Off-time: ', off_time))
+                print(('On-time: ', on_time, 'Off-time: ', off_time))
                 GPIO.output(pinHeat, ON)
                 time.sleep(on_time)
                 GPIO.output(pinHeat, OFF)
@@ -145,6 +144,7 @@ def heatProcGPIO(cycle_time, duty_cycle, conn):
 
 
 def unPackParamInitAndPost(paramStatus):
+    init_needed = False
     mode = paramStatus["mode"]
     cycle_time = paramStatus["cycle_time"]
     duty_cycle = paramStatus["duty_cycle"]
@@ -155,9 +155,14 @@ def unPackParamInitAndPost(paramStatus):
     k_param = paramStatus["k_param"]
     i_param = paramStatus["i_param"]
     d_param = paramStatus["d_param"]
+    if (paramStatus["k_param"] != Param.status["k_param"] or
+        paramStatus["cycle_time"] != Param.status["cycle_time"] or
+        paramStatus["i_param"] != Param.status["i_param"] or
+        paramStatus["d_param"] != Param.status["d_param"]):
+        init_needed = True
 
-    return mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, \
-        boil_manage_temp, num_pnts_smooth, k_param, i_param, d_param
+    return mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
+        k_param, i_param, d_param, init_needed
 
 
 def packParamGet(temp, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle,
@@ -182,7 +187,7 @@ def packParamGet(temp, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle,
 # Main Temperature Control Process
 def tempControlProc(paramStatus, statusQ, conn):
         mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
-            k_param, i_param, d_param = unPackParamInitAndPost(paramStatus)
+            k_param, i_param, d_param, init_needed = unPackParamInitAndPost(paramStatus)
 
         p = current_process()
         print(('Starting:', p.name, p.pid))
@@ -207,6 +212,7 @@ def tempControlProc(paramStatus, statusQ, conn):
         manage_boil_trigger = False
         temp_ma = 0.0
         readyPIDcalc = False
+        pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # init pid
 
         while True:
             readytemp = False
@@ -220,6 +226,11 @@ def tempControlProc(paramStatus, statusQ, conn):
 
                 temp_str = "%3.2f" % temp
                 readytemp = True
+
+            while conn.poll():  # POST settings - Received POST from web browser or Android device
+                paramStatus = conn.recv()
+                mode, cycle_time, duty_cycle_temp, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
+                    k_param, i_param, d_param, init_needed = unPackParamInitAndPost(paramStatus)
 
             if readytemp:
                 if mode == "auto":
@@ -241,7 +252,8 @@ def tempControlProc(paramStatus, statusQ, conn):
 
                     # calculate PID every cycle
                     if readyPIDcalc:
-                        #pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # init pid
+                        if init_needed:
+                            pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # mod pid
                         duty_cycle = pid.calcPID(temp_ma, set_point, True)
                         # send to heat process every cycle
                         parent_conn_heat.send([cycle_time, duty_cycle])
@@ -255,9 +267,8 @@ def tempControlProc(paramStatus, statusQ, conn):
 
                 # put current status in queue
                 try:
-                    paramStatus = packParamGet(temp_str, elapsed, mode, cycle_time, duty_cycle,
-                                               boil_duty_cycle, set_point, boil_manage_temp,
-                                               num_pnts_smooth, k_param, i_param, d_param)
+                    paramStatus = packParamGet(temp_str, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle,
+                            set_point, boil_manage_temp, num_pnts_smooth, k_param, i_param, d_param)
                     statusQ.put(paramStatus)  # GET request
                 except Full:
                     pass
@@ -273,33 +284,34 @@ def tempControlProc(paramStatus, statusQ, conn):
                 cycle_time, duty_cycle = parent_conn_heat.recv()  # non blocking receive from Heat Process
                 readyPIDcalc = True
 
-            readyPOST = False
-            while conn.poll():  # POST settings - Received POST from web browser or Android device
-                paramStatus = conn.recv()
-                mode, cycle_time, duty_cycle_temp, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
-                    k_param, i_param, d_param = unPackParamInitAndPost(paramStatus)
+            #readyPOST = False
+            #while conn.poll():  # POST settings - Received POST from web browser or Android device
+                #paramStatus = conn.recv()
+                #mode, cycle_time, duty_cycle_temp, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
+                    #k_param, i_param, d_param, init_needed = unPackParamInitAndPost(paramStatus)
 
-                readyPOST = True
-            if readyPOST:
-                if mode == "auto":
-                    print("auto selected")
-                    pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # init pid
-                    duty_cycle = pid.calcPID(temp_ma, set_point, True)
-                    parent_conn_heat.send([cycle_time, duty_cycle])
-                if mode == "boil":
-                    print("boil selected")
-                    boil_duty_cycle = duty_cycle_temp
-                    duty_cycle = 100  # full power to boil manage temperature
-                    manage_boil_trigger = True
-                    parent_conn_heat.send([cycle_time, duty_cycle])
-                if mode == "manual":
-                    print("manual selected")
-                    duty_cycle = duty_cycle_temp
-                    parent_conn_heat.send([cycle_time, duty_cycle])
-                if mode == "off":
-                    print("off selected")
-                    duty_cycle = 0
-                    parent_conn_heat.send([cycle_time, duty_cycle])
+                #readyPOST = True
+            #if readyPOST:
+                #if mode == "auto":
+                    #print("auto selected")
+                    #if init_needed:
+                        #pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # init pid
+                    #duty_cycle = pid.calcPID(temp_ma, set_point, True)
+                    #parent_conn_heat.send([cycle_time, duty_cycle])
+                #if mode == "boil":
+                    #print("boil selected")
+                    #boil_duty_cycle = duty_cycle_temp
+                    #duty_cycle = 100  # full power to boil manage temperature
+                    #manage_boil_trigger = True
+                    #parent_conn_heat.send([cycle_time, duty_cycle])
+                #if mode == "manual":
+                    #print("manual selected")
+                    #duty_cycle = duty_cycle_temp
+                    #parent_conn_heat.send([cycle_time, duty_cycle])
+                #if mode == "off":
+                    #print("off selected")
+                    #duty_cycle = 0
+                    #parent_conn_heat.send([cycle_time, duty_cycle])
             time.sleep(.01)
 
 

@@ -29,7 +29,6 @@ class PIDController(object):
             self.k0 = self.kc * self.ts / self.ti
         self.k1 = self.kc * self.td / self.ts
 
-
     def calcPID(self, xk, tset, enable):
         ek = tset - xk  # calculate e[k] = SP[k] - PV[k]
 
@@ -43,10 +42,10 @@ class PIDController(object):
         self.pi = self.k0 * ek  # + Kc*Ts/Ti * e[k]
         self.pd = self.k1 * (2.0 * PIDController.xk_1 - xk - PIDController.xk_2)
         PIDController.yk += self.pp + self.pi + self.pd
-            
+
         PIDController.xk_2 = PIDController.xk_1  # PV[k-2] = PV[k-1]
         PIDController.xk_1 = xk    # PV[k-1] = PV[k]
-        
+
         # limit y[k] to GMA_HLIM and GMA_LLIM
         if PIDController.yk > PIDController.GMA_HLIM:
             PIDController.yk = PIDController.GMA_HLIM
