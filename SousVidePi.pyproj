@@ -1,0 +1,98 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{70f4cdc5-423e-4d89-ac87-febbe2ad2488}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>RpiSousVide.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId />
+    <InterpreterVersion />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="mcp3208.py" />
+    <Compile Include="PIDController.py" />
+    <Compile Include="RpiSousVide.py" />
+    <Compile Include="Temp1Wire.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="static\external\bootstrap-3.0.3\css\bootstrap-theme.css" />
+    <Content Include="static\external\bootstrap-3.0.3\css\bootstrap-theme.min.css" />
+    <Content Include="static\external\bootstrap-3.0.3\css\bootstrap.css" />
+    <Content Include="static\external\bootstrap-3.0.3\css\bootstrap.min.css" />
+    <Content Include="static\external\bootstrap-3.0.3\fonts\glyphicons-halflings-regular.svg" />
+    <Content Include="static\external\bootstrap-3.0.3\js\bootstrap.js" />
+    <Content Include="static\external\bootstrap-3.0.3\js\bootstrap.min.js" />
+    <Content Include="static\external\css-toggle-switch\toggle-switch.css" />
+    <Content Include="static\external\flot-0.8.2\excanvas.js" />
+    <Content Include="static\external\flot-0.8.2\excanvas.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.colorhelpers.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.colorhelpers.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.canvas.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.canvas.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.categories.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.categories.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.crosshair.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.crosshair.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.errorbars.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.errorbars.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.fillbetween.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.fillbetween.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.image.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.image.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.navigate.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.navigate.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.pie.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.pie.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.resize.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.resize.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.selection.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.selection.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.stack.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.stack.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.symbol.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.symbol.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.threshold.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.threshold.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.time.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.flot.time.min.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.js" />
+    <Content Include="static\external\flot-0.8.2\jquery.min.js" />
+    <Content Include="static\external\gauge.js" />
+    <Content Include="static\external\jquery-2.0.3\jquery-2.0.3.js" />
+    <Content Include="static\external\jquery-2.0.3\jquery-2.0.3.min.js" />
+    <Content Include="static\sousvidepi.css" />
+    <Content Include="static\sousvidepi.js" />
+    <Content Include="static\sousvidepi_bootstrap.css" />
+    <Content Include="static\sousvidepi_bootstrap.js" />
+    <Content Include="templates\sousvidepi.html" />
+    <Content Include="templates\sousvidepi_bootstrap.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="static" />
+    <Folder Include="static\external" />
+    <Folder Include="static\external\bootstrap-3.0.3\" />
+    <Folder Include="static\external\bootstrap-3.0.3\css" />
+    <Folder Include="static\external\bootstrap-3.0.3\fonts" />
+    <Folder Include="static\external\bootstrap-3.0.3\js" />
+    <Folder Include="static\external\css-toggle-switch" />
+    <Folder Include="static\external\flot-0.8.2" />
+    <Folder Include="static\external\jquery-2.0.3" />
+    <Folder Include="templates" />
+  </ItemGroup>
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
+</Project>

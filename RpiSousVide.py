@@ -1,4 +1,5 @@
-
+import ptvsd
+ptvsd.enable_attach('test')
 from multiprocessing import Process, Pipe, Queue, current_process
 from Queue import Full
 import os, time
