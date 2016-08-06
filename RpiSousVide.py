@@ -1,5 +1,6 @@
 import ptvsd
-ptvsd.enable_attach('test')
+#ptvsd.enable_attach(None)
+#ptvsd.wait_for_attach()
 from multiprocessing import Process, Pipe, Queue, current_process
 from Queue import Full
 import os, time
@@ -10,7 +11,7 @@ import xml.etree.ElementTree as ET
 from flask import Flask, render_template, request, jsonify
 
 global parent_conn, statusQ
-global xml_root, template_name, pinHeat, pinGPIOList, tempSensorId, tempSensorPin
+global xml_root, template_name, pinHeat, pinGPIOList, tempSensorId, tempSensorPin, inputpin
 
 app = Flask(__name__, template_folder='templates')
 
@@ -89,13 +90,16 @@ def getstatus():
 
 # Stand Alone Get Temperature Process
 def gettempProc(conn):
+    #ptvsd.enable_attach(None)
+    #ptvsd.wait_for_attach()
+
     p = current_process()
     print(('Starting:', p.name, p.pid))
     if not tempSensorId == "None":
         myTempSensor = Temp1Wire.Temp1Wire(tempSensorId)
         while True:
             t = time.time()
-            time.sleep(2)
+            time.sleep(1.91)
             num = myTempSensor.readTempC()
             elapsed = "%.2f" % (time.time() - t)
             conn.send([num, elapsed])
@@ -104,7 +108,7 @@ def gettempProc(conn):
         myADC = mcp3208.mcp3208(tempSensorPin)
         while True:
             t = time.time()
-            time.sleep(2)
+            time.sleep(1.91)
             num = myADC.temp_get()
             elapsed = "%.2f" % (time.time() - t)
             conn.send([num, elapsed])
@@ -120,6 +124,9 @@ def getonofftime(cycle_time, duty_cycle):
 
 # Stand Alone Heat Process using GPIO
 def heatProcGPIO(cycle_time, duty_cycle, conn):
+    #ptvsd.enable_attach(None)
+    #ptvsd.wait_for_attach()
+
     p = current_process()
     print(('Starting:', p.name, p.pid))
     if pinHeat > 0:
@@ -128,7 +135,7 @@ def heatProcGPIO(cycle_time, duty_cycle, conn):
             while conn.poll():  # get last
                 cycle_time, duty_cycle = conn.recv()
                 print('Cycle_time: ', cycle_time, 'Duty cycle: ', duty_cycle)
-            conn.send([cycle_time, duty_cycle])
+            #conn.send([cycle_time, duty_cycle])
             if int(duty_cycle) == 0:
                 GPIO.output(pinHeat, OFF)
                 time.sleep(cycle_time)
@@ -137,12 +144,21 @@ def heatProcGPIO(cycle_time, duty_cycle, conn):
                 time.sleep(cycle_time)
             else:
                 on_time, off_time = getonofftime(cycle_time, duty_cycle)
-                print(('On-time: ', on_time, 'Off-time: ', off_time))
+                #print(('On-time: ', on_time, 'Off-time: ', off_time))
                 GPIO.output(pinHeat, ON)
                 time.sleep(on_time)
                 GPIO.output(pinHeat, OFF)
                 time.sleep(off_time)
 
+def heatOutputCheck():
+    p = current_process()
+    print(('Starting:', p.name, p.pid))
+    previous = 0
+    while True:
+        if (GPIO.input(inputpin) and previous == 1):
+            print("Heat Output turned OFF")
+        previous = GPIO.input(inputpin)
+        time.sleep(0.1)
 
 def unPackParamInitAndPost(paramStatus):
     init_needed = False
@@ -187,12 +203,15 @@ def packParamGet(temp, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle,
 
 # Main Temperature Control Process
 def tempControlProc(paramStatus, statusQ, conn):
+        #ptvsd.enable_attach(None)
+        #ptvsd.wait_for_attach()
+
         mode, cycle_time, duty_cycle, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
             k_param, i_param, d_param, init_needed = unPackParamInitAndPost(paramStatus)
 
         p = current_process()
         print(('Starting:', p.name, p.pid))
-
+        
         # Pipe to communicate with "Get Temperature Process"
         parent_conn_temp, child_conn_temp = Pipe()
         # Start Get Temperature Process
@@ -208,6 +227,11 @@ def tempControlProc(paramStatus, statusQ, conn):
             args=(cycle_time, duty_cycle, child_conn_heat))
         pheat.daemon = True
         pheat.start()
+
+        # Start heatOutputCheck Process
+        #pheatCheck = Process(name="heatOutputCheck", target=heatOutputCheck)
+        #pheatCheck.daemon = True
+        #pheatCheck.start()
 
         temp_ma_list = []
         manage_boil_trigger = False
@@ -242,29 +266,25 @@ def tempControlProc(paramStatus, statusQ, conn):
                     while len(temp_ma_list) > num_pnts_smooth:
                         temp_ma_list.pop(0)  # remove oldest elements in list
 
-                    if len(temp_ma_list) < num_pnts_smooth:
-                        for temp_pnt in temp_ma_list:
-                            temp_ma += temp_pnt
-                        temp_ma /= len(temp_ma_list)
-                    else:  # len(temp_ma_list) == num_pnts_smooth
-                        for temp_idx in range(num_pnts_smooth):
-                            temp_ma += temp_ma_list[temp_idx]
-                        temp_ma /= num_pnts_smooth
+                    for temp_pnt in temp_ma_list:
+                        temp_ma += temp_pnt
+                    temp_ma /= len(temp_ma_list)
 
                     # calculate PID every cycle
-                    if readyPIDcalc:
-                        if init_needed:
-                            pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # mod pid
-                        duty_cycle = pid.calcPID(temp_ma, set_point, True)
-                        # send to heat process every cycle
-                        parent_conn_heat.send([cycle_time, duty_cycle])
-                        readyPIDcalc = False
+                    if init_needed:
+                        pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # mod pid
 
-                if mode == "boil":
-                    if (temp > boil_manage_temp) and manage_boil_trigger:  # do once
-                        manage_boil_trigger = False
-                        duty_cycle = boil_duty_cycle
-                        parent_conn_heat.send([cycle_time, duty_cycle])
+                    duty_cycle = pid.calcPID(temp_ma, set_point, True)
+                    # send to heat process every cycle
+                    parent_conn_heat.send([cycle_time, duty_cycle])
+
+                if mode == "manual":
+                    duty_cycle = duty_cycle_temp
+                    parent_conn_heat.send([cycle_time, duty_cycle])
+
+                if mode == "off":
+                    duty_cycle = 0
+                    parent_conn_heat.send([cycle_time, duty_cycle])
 
                 # put current status in queue
                 try:
@@ -279,41 +299,8 @@ def tempControlProc(paramStatus, statusQ, conn):
 
                 print(("Current Temp: %3.2f C, Heat Output: %3.1f%%" % (temp, duty_cycle)))
 
-                # logdata(temp, duty_cycle)
-
-            while parent_conn_heat.poll():  # Poll Heat Process Pipe
-                cycle_time, duty_cycle = parent_conn_heat.recv()  # non blocking receive from Heat Process
-                readyPIDcalc = True
-
-            #readyPOST = False
-            #while conn.poll():  # POST settings - Received POST from web browser or Android device
-                #paramStatus = conn.recv()
-                #mode, cycle_time, duty_cycle_temp, boil_duty_cycle, set_point, boil_manage_temp, num_pnts_smooth, \
-                    #k_param, i_param, d_param, init_needed = unPackParamInitAndPost(paramStatus)
-
-                #readyPOST = True
-            #if readyPOST:
-                #if mode == "auto":
-                    #print("auto selected")
-                    #if init_needed:
-                        #pid = PIDController.PIDController(cycle_time, k_param, i_param, d_param)  # init pid
-                    #duty_cycle = pid.calcPID(temp_ma, set_point, True)
-                    #parent_conn_heat.send([cycle_time, duty_cycle])
-                #if mode == "boil":
-                    #print("boil selected")
-                    #boil_duty_cycle = duty_cycle_temp
-                    #duty_cycle = 100  # full power to boil manage temperature
-                    #manage_boil_trigger = True
-                    #parent_conn_heat.send([cycle_time, duty_cycle])
-                #if mode == "manual":
-                    #print("manual selected")
-                    #duty_cycle = duty_cycle_temp
-                    #parent_conn_heat.send([cycle_time, duty_cycle])
-                #if mode == "off":
-                    #print("off selected")
-                    #duty_cycle = 0
-                    #parent_conn_heat.send([cycle_time, duty_cycle])
-            time.sleep(.01)
+            #logdata(temp, duty_cycle)
+            time.sleep(cycle_time/2)
 
 
 # def logdata(tank, temp, heat):
@@ -356,6 +343,9 @@ if __name__ == '__main__':
 
     for pin in pinGPIOList:
         GPIO.setup(pin, GPIO.OUT)
+
+    inputpin = 17
+    GPIO.setup(inputpin,GPIO.IN)
 
     statusQ = Queue(2)  # blocking queue
     parent_conn, child_conn = Pipe()
