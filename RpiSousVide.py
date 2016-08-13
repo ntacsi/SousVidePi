@@ -123,7 +123,7 @@ def getonofftime(cycle_time, duty_cycle):
 
 
 # Stand Alone Heat Process using GPIO
-def heatProcGPIO(cycle_time, duty_cycle, conn):
+def heatProcGPIO(conn):
     #ptvsd.enable_attach(None)
     #ptvsd.wait_for_attach()
 
@@ -131,11 +131,12 @@ def heatProcGPIO(cycle_time, duty_cycle, conn):
     print(('Starting:', p.name, p.pid))
     if pinHeat > 0:
         GPIO.setup(pinHeat, GPIO.OUT)
+        duty_cycle = 0
+        cycle_time = 3
         while True:
             while conn.poll():  # get last
                 cycle_time, duty_cycle = conn.recv()
-                print('Cycle_time: ', cycle_time, 'Duty cycle: ', duty_cycle)
-            #conn.send([cycle_time, duty_cycle])
+            conn.send([cycle_time, duty_cycle])
             if int(duty_cycle) == 0:
                 GPIO.output(pinHeat, OFF)
                 time.sleep(cycle_time)
@@ -144,7 +145,6 @@ def heatProcGPIO(cycle_time, duty_cycle, conn):
                 time.sleep(cycle_time)
             else:
                 on_time, off_time = getonofftime(cycle_time, duty_cycle)
-                #print(('On-time: ', on_time, 'Off-time: ', off_time))
                 GPIO.output(pinHeat, ON)
                 time.sleep(on_time)
                 GPIO.output(pinHeat, OFF)
@@ -224,7 +224,7 @@ def tempControlProc(paramStatus, statusQ, conn):
         parent_conn_heat, child_conn_heat = Pipe()
         # Start Heat Process
         pheat = Process(name="heatProcGPIO", target=heatProcGPIO,
-            args=(cycle_time, duty_cycle, child_conn_heat))
+            args=(child_conn_heat,))
         pheat.daemon = True
         pheat.start()
 
@@ -286,6 +286,9 @@ def tempControlProc(paramStatus, statusQ, conn):
                     duty_cycle = 0
                     parent_conn_heat.send([cycle_time, duty_cycle])
 
+                while parent_conn_heat.poll():  # Poll Heat Process Pipe
+                    cycle_time, duty_cycle = parent_conn_heat.recv()  # non blocking receive from Heat Process
+
                 # put current status in queue
                 try:
                     paramStatus = packParamGet(temp_str, elapsed, mode, cycle_time, duty_cycle, boil_duty_cycle,
@@ -300,7 +303,7 @@ def tempControlProc(paramStatus, statusQ, conn):
                 print(("Current Temp: %3.2f C, Heat Output: %3.1f%%" % (temp, duty_cycle)))
 
             #logdata(temp, duty_cycle)
-            time.sleep(cycle_time/2)
+            time.sleep(0.5)
 
 
 # def logdata(tank, temp, heat):
